@@ -186,6 +186,34 @@ async def test_dm(interaction: discord.Interaction):
             ephemeral=True,
         )
 
+
+@tree.command(name="debug_vinted", description="Teste la connexion à Vinted")
+async def debug_vinted(interaction: discord.Interaction, recherche: str = "nike"):
+    await interaction.response.defer(ephemeral=True)
+
+    def _test():
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        r1 = s.get(BASE, timeout=15)
+        cookies = list(s.cookies.keys())
+        r2 = s.get(
+            API,
+            params={"search_text": recherche, "per_page": "5"},
+            headers={"Accept": "application/json, text/plain, */*"},
+            timeout=15,
+        )
+        return r1.status_code, cookies, r2.status_code, r2.text[:300]
+
+    try:
+        s1, cookies, s2, body = await asyncio.to_thread(_test)
+        await interaction.followup.send(
+            f"Accueil : **{s1}**\nCookies : {cookies}\nAPI : **{s2}**\n```{body}```",
+            ephemeral=True,
+        )
+    except Exception as e:
+        await interaction.followup.send(f"Erreur : {e}", ephemeral=True)
+
+
 # ---------- Boucle de vérification ----------
 @tasks.loop(minutes=2)
 async def check_loop():
