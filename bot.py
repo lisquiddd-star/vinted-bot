@@ -1,3 +1,5 @@
+from flask import Flask
+import threading
 import discord
 from discord import app_commands
 import requests, json, os
@@ -56,5 +58,8 @@ async def on_ready():
     await tree.sync()
     if not check_loop.is_running(): check_loop.start()
     print(f"Connecté {client.user}")
-
+app = Flask('')
+@app.route('/')
+def home(): return "Bot OK"
+threading.Thread(target=lambda: app.run(host='0.0.0.0', port=10000)).start()
 client.run(TOKEN)
