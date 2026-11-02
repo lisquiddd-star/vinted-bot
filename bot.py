@@ -23,6 +23,7 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
+
 # ---------- Sauvegarde des alertes ----------
 def load_alertes():
     try:
@@ -31,6 +32,7 @@ def load_alertes():
     except Exception:
         return {}
 
+
 def save_alertes():
     try:
         with open(ALERTS_FILE, "w", encoding="utf-8") as f:
@@ -38,11 +40,13 @@ def save_alertes():
     except Exception as e:
         print(f"Erreur sauvegarde: {e}")
 
+
 alertes = load_alertes()
 
 # ---------- Vinted ----------
 _session = None
 _lock = threading.Lock()
+
 
 def _new_session():
     s = requests.Session()
@@ -50,6 +54,7 @@ def _new_session():
     r = s.get(BASE, timeout=15)
     print(f"Init session Vinted: {r.status_code}")
     return s
+
 
 def _search_sync(marque, categorie, prix_max):
     global _session
@@ -85,8 +90,10 @@ def _search_sync(marque, categorie, prix_max):
                 _session = None
         return []
 
+
 async def search_vinted(marque, categorie, prix_max):
     return await asyncio.to_thread(_search_sync, marque, categorie, prix_max)
+
 
 def build_embed(it):
     iid = str(it.get("id"))
@@ -112,6 +119,7 @@ def build_embed(it):
         embed.set_image(url=photo_url)
     return embed
 
+
 # ---------- Commandes ----------
 @tree.command(name="alerte", description="Créer une alerte Vinted")
 async def alerte(interaction: discord.Interaction, marque: str, categorie: str, prix_max: int):
@@ -124,7 +132,7 @@ async def alerte(interaction: discord.Interaction, marque: str, categorie: str, 
         "marque": marque,
         "categorie": categorie,
         "prix_max": prix_max,
-        "seen": [str(it.get("id")) for it in items],  # tout est marqué comme vu
+        "seen": [str(it.get("id")) for it in items],
     })
     save_alertes()
 
@@ -140,15 +148,15 @@ async def alerte(interaction: discord.Interaction, marque: str, categorie: str, 
             )
         else:
             await interaction.user.send(
-                f"Aucun résultat pour {marque} {categorie} pour l'instant, "
-                f"je te préviens dès que ça sort."
+                f"Aucun résultat pour {marque} {categorie} (ou Vinted bloque le bot). "
+                f"Tape /debug_vinted pour voir."
             )
     except discord.Forbidden:
         await interaction.followup.send(
-            "❌ Je ne peux pas t'envoyer de MP. Autorise les messages privés "
-            "(Paramètres de confidentialité du serveur).",
+            "❌ Je ne peux pas t'envoyer de MP. Autorise les messages privés.",
             ephemeral=True,
         )
+
 
 @tree.command(name="mes_alertes", description="Voir tes alertes")
 async def mes_alertes(interaction: discord.Interaction):
@@ -162,6 +170,7 @@ async def mes_alertes(interaction: discord.Interaction):
     )
     await interaction.response.send_message(txt, ephemeral=True)
 
+
 @tree.command(name="supprimer_alerte", description="Supprimer une alerte (numéro de /mes_alertes)")
 async def supprimer_alerte(interaction: discord.Interaction, numero: int):
     lst = alertes.get(str(interaction.user.id), [])
@@ -174,13 +183,15 @@ async def supprimer_alerte(interaction: discord.Interaction, numero: int):
     else:
         await interaction.response.send_message("Numéro invalide.", ephemeral=True)
 
+
 @tree.command(name="test_dm", description="Test si DM OK")
 async def test_dm(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     try:
         await interaction.user.send("✅ DM OK ! Bot opérationnel")
-        await interaction.response.send_message("✅ DM envoyé, regarde tes MP !", ephemeral=True)
+        await interaction.followup.send("✅ DM envoyé, regarde tes MP !", ephemeral=True)
     except discord.Forbidden:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "❌ Ouvre tes DM Discord ! Clic droit sur le serveur > Paramètres de "
             "confidentialité > Autoriser les MP",
             ephemeral=True,
@@ -226,18 +237,20 @@ async def check_loop():
             for al in lst:
                 items = await search_vinted(al["marque"], al["categorie"], al["prix_max"])
                 new_items = [it for it in items if str(it.get("id")) not in al["seen"]]
-                for it in reversed(new_items):  # du plus ancien au plus récent
+                for it in reversed(new_items):
                     al["seen"].append(str(it.get("id")))
                     try:
                         await user.send(embed=build_embed(it))
                     except Exception as e:
                         print(f"Erreur DM: {e}")
-                al["seen"] = al["seen"][-200:]  # évite que la liste grossisse sans fin
-                await asyncio.sleep(2)  # évite de spammer Vinted
+                al["seen"] = al["seen"][-200:]
+                await asyncio.sleep(2)
         save_alertes()
     except Exception as e:
         print(f"Erreur check_loop: {e}")
 
+
+# ---------- Test au démarrage (résultat dans les logs) ----------
 def startup_test():
     try:
         s = requests.Session()
@@ -254,6 +267,7 @@ def startup_test():
     except Exception as e:
         print(f"[TEST VINTED] erreur: {e}")
 
+
 @client.event
 async def on_ready():
     synced = await tree.sync()
@@ -261,14 +275,18 @@ async def on_ready():
     await asyncio.to_thread(startup_test)
     if not check_loop.is_running():
         check_loop.start()
+    print("VERSION 2 OK")
     print(f"Connecté {client.user}")
+
 
 # ---------- Mini serveur web (pour Render / UptimeRobot) ----------
 app = Flask(__name__)
 
+
 @app.route("/")
 def home():
     return "Bot OK"
+
 
 threading.Thread(
     target=lambda: app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000))),
