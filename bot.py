@@ -4,11 +4,17 @@ import os
 import json
 import asyncio
 import threading
-import requests
+from curl_cffi import requests as _r
 import discord
 from discord import app_commands
 from discord.ext import tasks
 from flask import Flask
+
+
+class requests:
+    @staticmethod
+    def Session():
+        return _r.Session(impersonate="chrome")
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 BASE = "https://www.vinted.fr"
