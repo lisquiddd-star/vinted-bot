@@ -238,9 +238,27 @@ async def check_loop():
     except Exception as e:
         print(f"Erreur check_loop: {e}")
 
+def startup_test():
+    try:
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        r1 = s.get(BASE, timeout=15)
+        r2 = s.get(
+            API,
+            params={"search_text": "nike", "per_page": "5"},
+            headers={"Accept": "application/json, text/plain, */*"},
+            timeout=15,
+        )
+        print(f"[TEST VINTED] Accueil={r1.status_code} cookies={list(s.cookies.keys())} "
+              f"API={r2.status_code} body={r2.text[:300]}")
+    except Exception as e:
+        print(f"[TEST VINTED] erreur: {e}")
+
 @client.event
 async def on_ready():
-    await tree.sync()
+    synced = await tree.sync()
+    print(f"{len(synced)} commandes synchronisées : {[c.name for c in synced]}")
+    await asyncio.to_thread(startup_test)
     if not check_loop.is_running():
         check_loop.start()
     print(f"Connecté {client.user}")
